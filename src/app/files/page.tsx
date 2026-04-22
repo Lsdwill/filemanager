@@ -17,6 +17,7 @@ interface FileInfo {
   type: string;
   folder: string;
   created_at: string;
+  thumbnail_url?: string;
 }
 
 interface FolderInfo {
@@ -40,6 +41,11 @@ function getFileIcon(type: string) {
 function isPreviewable(type: string) {
   const t = type.toLowerCase();
   return ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'mp4', 'webm', 'mov', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'mp3', 'wav', 'flac', 'aac'].includes(t);
+}
+
+function isImageType(type: string) {
+  const t = type.toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp'].includes(t);
 }
 
 function formatSize(bytes: number) {
@@ -70,6 +76,7 @@ export default function FilesPage() {
   const [shareFile, setShareFile] = useState<FileInfo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
 
@@ -94,6 +101,30 @@ export default function FilesPage() {
   useEffect(() => {
     fetchFiles();
   }, [fetchFiles]);
+
+  useEffect(() => {
+    const imageFiles = files.filter(f => isImageType(f.type));
+    if (imageFiles.length === 0) return;
+
+    const loadThumbnails = async () => {
+      const newThumbnails: Record<string, string> = {};
+      for (const file of imageFiles) {
+        try {
+          const encodedKey = encodeURIComponent(file.oss_key);
+          const res = await fetch(`/api/files/thumbnail/${encodedKey}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            newThumbnails[file.id] = data.thumbnail_url;
+          }
+        } catch {}
+      }
+      setThumbnails(prev => ({ ...prev, ...newThumbnails }));
+    };
+
+    loadThumbnails();
+  }, [files, token]);
 
   const breadcrumbs = currentFolder
     ? currentFolder.split('/').map((name, i) => ({
@@ -409,7 +440,11 @@ export default function FilesPage() {
                 <div key={file.id} className="group bg-white/5 hover:bg-white/10 rounded-xl p-4 border border-white/10 hover:border-blue-400/30 transition-all cursor-pointer"
                   onClick={() => isPreviewable(file.type) ? openPreview(file) : undefined}>
                   <div className="flex justify-center mb-3">
-                    {getFileIcon(file.type)}
+                    {isImageType(file.type) && thumbnails[file.id] ? (
+                      <img src={thumbnails[file.id]} alt={file.filename} className="w-16 h-16 rounded-lg object-cover" />
+                    ) : (
+                      getFileIcon(file.type)
+                    )}
                   </div>
                   <p className="text-white text-sm font-medium truncate mb-1">{file.filename}</p>
                   <p className="text-white/40 text-xs">{formatSize(file.size)}</p>
@@ -452,7 +487,11 @@ export default function FilesPage() {
               {filteredFiles.map(file => (
                 <div key={file.id} className="flex items-center gap-4 bg-white/5 hover:bg-white/10 rounded-xl px-4 py-3 border border-white/10 hover:border-blue-400/30 transition-all cursor-pointer"
                   onClick={() => isPreviewable(file.type) ? openPreview(file) : undefined}>
-                  {getFileIcon(file.type)}
+                  {isImageType(file.type) && thumbnails[file.id] ? (
+                    <img src={thumbnails[file.id]} alt={file.filename} className="w-10 h-10 rounded-lg object-cover" />
+                  ) : (
+                    getFileIcon(file.type)
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-medium truncate">{file.filename}</p>
                     <p className="text-white/40 text-xs">{formatSize(file.size)} · {formatDate(file.created_at)}</p>

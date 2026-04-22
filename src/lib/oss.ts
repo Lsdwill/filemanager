@@ -43,6 +43,14 @@ export async function generatePreviewUrl(key: string, expires: number = 3600) {
   return url.replace('http://', 'https://');
 }
 
+export async function generateThumbnailUrl(key: string, width: number = 200, height: number = 200, expires: number = 3600) {
+  const url = client.signatureUrl(key, {
+    expires,
+    process: `image/resize,m_fill,w_${width},h_${height}`,
+  });
+  return url.replace('http://', 'https://');
+}
+
 export async function getObjectMeta(key: string) {
   const result = await client.head(key);
   return result;
