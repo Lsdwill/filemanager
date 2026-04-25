@@ -50,3 +50,99 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* Marquee animation for long filenames */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(calc(-100% + var(--visible-width, 0px))); }
+}
+
+.animate-marquee {
+  animation: marquee 4s linear infinite;
+}
+
+/* Dock bar styles */
+.dock-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px 12px;
+}
+
+.dock-item {
+  transition: transform 0.15s ease-out;
+  cursor: pointer;
+  position: relative;
+}
+
+.dock-item img {
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.dock-item.current-item::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #60a5fa;
+  border-radius: 50%;
+}
+
+/* Markdown prose styles */
+.prose pre {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.prose code {
+  color: #60a5fa;
+  font-size: 0.875em;
+}
+
+.prose pre code {
+  color: #e2e8f0;
+}
+
+.prose a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.prose blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  padding-left: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.prose th, .prose td {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 0.75rem;
+}
+
+.prose th {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.prose img {
+  border-radius: 0.75rem;
+  max-width: 100%;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4 {
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.3rem;
+}

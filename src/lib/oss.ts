@@ -16,10 +16,16 @@ export async function listObjects(prefix?: string) {
 }
 
 export async function uploadFile(key: string, data: Buffer | string, options?: { mime?: string }) {
-  const result = await client.put(key, data, {
+  // If data is a string, convert to Buffer (ali-oss treats string as file path)
+  const content = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
+  const result = await client.put(key, content, {
     mime: options?.mime,
   });
   return result;
+}
+
+export async function copyObject(sourceKey: string, targetKey: string) {
+  await (client as any).copy(targetKey, sourceKey);
 }
 
 export async function deleteObject(key: string) {
@@ -43,6 +49,12 @@ export async function generatePreviewUrl(key: string, expires: number = 3600) {
   return url.replace('http://', 'https://');
 }
 
+export function generatePermanentUrl(key: string) {
+  const bucket = process.env.OSS_BUCKET_NAME!;
+  const region = process.env.OSS_REGION!;
+  return `https://${bucket}.oss-${region}.aliyuncs.com/${key}`;
+}
+
 export async function generateThumbnailUrl(key: string, width: number = 200, height: number = 200, expires: number = 3600) {
   const url = client.signatureUrl(key, {
     expires,
@@ -54,6 +66,31 @@ export async function generateThumbnailUrl(key: string, width: number = 200, hei
 export async function getObjectMeta(key: string) {
   const result = await client.head(key);
   return result;
+}
+
+export async function listObjectsByPrefix(prefix: string) {
+  const result = await client.list({
+    prefix,
+    'max-keys': 1000,
+  });
+  return result.objects || [];
+}
+
+export async function copyAndDeletePrefix(oldPrefix: string, newPrefix: string) {
+  const objects = await listObjectsByPrefix(oldPrefix);
+  for (const obj of objects) {
+    const relativePath = obj.name.slice(oldPrefix.length);
+    const newKey = newPrefix + relativePath;
+    await copyObject(obj.name, newKey);
+  }
+  for (const obj of objects) {
+    await deleteObject(obj.name);
+  }
+}
+
+export async function getObjectContent(key: string): Promise<string> {
+  const result = await (client as any).get(key);
+  return result.content.toString('utf-8');
 }
 
 export { client };

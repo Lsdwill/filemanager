@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, Lock, File, Clock, Eye, AlertCircle } from 'lucide-react';
+import { Download, Lock, File, Clock, Eye, AlertCircle, Image, Film, Music, FileText } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ShareData {
   share: {
@@ -15,7 +17,9 @@ interface ShareData {
     filename: string;
     size: number;
     type: string;
+    oss_key: string;
   };
+  preview_url?: string;
 }
 
 function formatSize(bytes: number) {
@@ -26,6 +30,18 @@ function formatSize(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function getFileCategory(type: string) {
+  const t = type.toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp'].includes(t)) return 'image';
+  if (['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(t)) return 'video';
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a'].includes(t)) return 'audio';
+  if (t === 'pdf') return 'pdf';
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(t)) return 'office';
+  if (['md', 'markdown'].includes(t)) return 'markdown';
+  if (t === 'txt') return 'text';
+  return 'other';
+}
+
 export default function ShareAccessPage({ params }: { params: Promise<{ id: string }> }) {
   const [shareCode, setShareCode] = useState<string>('');
   const [shareData, setShareData] = useState<ShareData | null>(null);
@@ -34,6 +50,8 @@ export default function ShareAccessPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [needPassword, setNeedPassword] = useState(false);
+  const [previewContent, setPreviewContent] = useState<string>('');
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     params.then(p => {
@@ -51,6 +69,11 @@ export default function ShareAccessPage({ params }: { params: Promise<{ id: stri
         if (data.share.is_password_protected) {
           setNeedPassword(true);
         }
+        // Fetch preview URL for previewable files
+        const category = getFileCategory(data.file.type);
+        if (['image', 'video', 'audio', 'pdf', 'office', 'markdown', 'text'].includes(category)) {
+          fetchPreviewUrl(code, data);
+        }
       } else {
         setError('分享不存在或已过期');
       }
@@ -58,6 +81,41 @@ export default function ShareAccessPage({ params }: { params: Promise<{ id: stri
       setError('获取分享信息失败');
     }
     setLoading(false);
+  }
+
+  async function fetchPreviewUrl(code: string, data: ShareData) {
+    setPreviewLoading(true);
+    try {
+      const res = await fetch('/api/share/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          share_code: code,
+          password: needPassword ? password : null,
+        }),
+      });
+      if (res.ok) {
+        const previewData = await res.json();
+        setShareData(prev => prev ? { ...prev, preview_url: previewData.preview_url } : prev);
+        // For markdown/text, fetch content
+        const category = getFileCategory(data.file.type);
+        if (category === 'markdown' || category === 'text') {
+          const contentRes = await fetch('/api/share/content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              share_code: code,
+              password: needPassword ? password : null,
+            }),
+          });
+          if (contentRes.ok) {
+            const contentData = await contentRes.json();
+            setPreviewContent(contentData.content);
+          }
+        }
+      }
+    } catch {}
+    setPreviewLoading(false);
   }
 
   async function handleDownload() {
@@ -108,9 +166,12 @@ export default function ShareAccessPage({ params }: { params: Promise<{ id: stri
     );
   }
 
+  const category = shareData ? getFileCategory(shareData.file.type) : 'other';
+  const canPreview = ['image', 'video', 'audio', 'pdf', 'office', 'markdown', 'text'].includes(category);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col items-center justify-center p-4">
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl max-w-4xl w-full">
         <div className="flex justify-center mb-6">
           <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center">
             <File className="w-8 h-8 text-blue-400" />
@@ -147,6 +208,46 @@ export default function ShareAccessPage({ params }: { params: Promise<{ id: stri
         )}
 
         {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
+
+        {/* Preview area */}
+        {canPreview && shareData?.preview_url && !needPassword && (
+          <div className="mb-6">
+            {category === 'image' && (
+              <img src={shareData.preview_url} alt={shareData.file.filename} className="max-w-full max-h-[50vh] mx-auto rounded-xl" />
+            )}
+            {category === 'video' && (
+              <video src={shareData.preview_url} controls className="max-w-full max-h-[50vh] mx-auto rounded-xl" />
+            )}
+            {category === 'audio' && (
+              <div className="text-center">
+                <Music className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
+                <audio src={shareData.preview_url} controls className="w-full" />
+              </div>
+            )}
+            {category === 'pdf' && (
+              <iframe src={shareData.preview_url} className="w-full h-[50vh] rounded-xl border border-white/10" title={shareData.file.filename} />
+            )}
+            {category === 'office' && (
+              <iframe src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(shareData.preview_url)}`} className="w-full h-[50vh] rounded-xl border-0" title={shareData.file.filename} />
+            )}
+            {category === 'markdown' && previewContent && (
+              <div className="bg-white/5 rounded-xl p-4 prose prose-invert prose-sm max-w-none max-h-[50vh] overflow-y-auto">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{previewContent}</ReactMarkdown>
+              </div>
+            )}
+            {category === 'text' && previewContent && (
+              <div className="bg-white/5 rounded-xl p-4 text-white text-sm font-mono whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                {previewContent}
+              </div>
+            )}
+          </div>
+        )}
+
+        {previewLoading && (
+          <div className="mb-6 flex items-center justify-center">
+            <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
 
         <button
           onClick={handleDownload}

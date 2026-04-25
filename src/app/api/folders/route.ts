@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { uploadFile, deleteObject, listObjects } from '@/lib/oss';
-import { insertFolder, getFolderByPath, deleteFolder, deleteFileByOssKey } from '@/lib/db';
+import { insertFolder, getFolderByPath, getFolderById, deleteFolder, deleteFileByOssKey, getFolders, getFiles } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+
+export async function GET() {
+  return NextResponse.json({ folders: getFolders() });
+}
 
 export async function POST(request: Request) {
   try {
@@ -40,6 +44,21 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
+
+    const folder = getFolderById(id);
+    if (!folder) {
+      return NextResponse.json({ error: '文件夹不存在' }, { status: 404 });
+    }
+
+    // Check if folder contains any files (including sub-folders)
+    const allFiles = getFiles();
+    const filesInFolder = allFiles.filter((f: any) => f.folder === folder.path || f.folder.startsWith(folder.path + '/'));
+    if (filesInFolder.length > 0) {
+      return NextResponse.json({ error: `文件夹内有 ${filesInFolder.length} 个文件，请先清空文件再删除` }, { status: 400 });
+    }
+
+    // Delete the .keep placeholder from OSS
+    await deleteObject(`${folder.path}/.keep`);
 
     deleteFolder(id);
 

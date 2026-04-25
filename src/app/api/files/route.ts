@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listObjects } from '@/lib/oss';
-import { insertFile, getFiles, getFileByOssKey, getSubFolders } from '@/lib/db';
+import { insertFile, getFiles, getFileByOssKey, getSubFolders, deleteFileByOssKey } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET(request: Request) {
@@ -11,6 +11,8 @@ export async function GET(request: Request) {
     // Sync OSS objects with local DB
     const objects = await listObjects();
     for (const obj of objects) {
+      // Skip .keep placeholder files used for folder representation
+      if (obj.name.endsWith('/.keep')) continue;
       const existing = getFileByOssKey(obj.name);
       if (!existing) {
         const filename = obj.name.split('/').pop() || obj.name;
@@ -26,6 +28,14 @@ export async function GET(request: Request) {
           type,
           folder: fileFolder,
         });
+      }
+    }
+
+    // Clean up any .keep files that were previously synced into the DB
+    const allFiles = getFiles();
+    for (const file of allFiles) {
+      if (file.oss_key.endsWith('/.keep') || file.filename === '.keep') {
+        deleteFileByOssKey(file.oss_key);
       }
     }
 

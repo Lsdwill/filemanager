@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getShareInfo, getShareDownloadUrl } from '@/lib/share';
+import { getShareInfo } from '@/lib/share';
 import { getBatchShareByCode, getFileById } from '@/lib/db';
-import { generateSignedUrl } from '@/lib/oss';
+import { generatePreviewUrl } from '@/lib/oss';
 
 export async function POST(request: Request) {
   try {
@@ -32,12 +32,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: '文件不存在' }, { status: 404 });
       }
 
-      const downloadUrl = await generateSignedUrl(file.oss_key, 3600);
+      const previewUrl = await generatePreviewUrl(file.oss_key, 3600);
 
       return NextResponse.json({
-        download_url: downloadUrl,
+        preview_url: previewUrl,
         filename: file.filename,
-        size: file.size,
+        type: file.type,
       });
     }
 
@@ -56,12 +56,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }
 
-    const downloadUrl = await getShareDownloadUrl(file.oss_key);
+    const previewUrl = await generatePreviewUrl(file.oss_key, 3600);
 
     return NextResponse.json({
-      download_url: downloadUrl,
+      preview_url: previewUrl,
       filename: file.filename,
-      size: file.size,
+      type: file.type,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
