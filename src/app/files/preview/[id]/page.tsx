@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '@/components/AuthProvider';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ArrowLeft, Download, File, Image, Film, Music, FileText, AlertCircle, ChevronLeft, ChevronRight, Pencil, Share2, X, Copy, Check, Link, Lock, Save, Eye, Edit3 } from 'lucide-react';
@@ -52,6 +53,7 @@ function getFileCategory(type: string) {
 }
 
 export default function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { token, isAuthenticated } = useAuth();
   const [data, setData] = useState<PreviewData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -86,16 +88,20 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     setBackFolder(urlParams.get('folder') || '');
-    params.then(p => {
-      fetchPreview(p.id);
-    });
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated || token) {
+      params.then(p => {
+        fetchPreview(p.id);
+      });
+    }
+  }, [isAuthenticated, token]);
 
   async function fetchPreview(id: string) {
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('token');
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`/api/files/preview/${id}`, { headers });
@@ -119,8 +125,9 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
   async function fetchContent(id: string) {
     setEditorLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/files/content/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/files/content/${id}`, { headers });
       if (res.ok) {
         const d = await res.json();
         setEditorContent(d.content);
@@ -137,10 +144,11 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
   async function saveContent(id: string) {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`/api/files/content/${id}`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ content: editorContent }),
       });
       if (res.ok) {
@@ -192,12 +200,13 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
 
   async function handleRename() {
     if (!data || !renameValue.trim()) return;
-    const token = localStorage.getItem('token');
     const urlId = window.location.pathname.split('/').pop();
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch('/api/files/rename', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ fileId: urlId, newName: renameValue.trim() }),
       });
       if (res.ok) {
@@ -221,13 +230,14 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
   async function createShare() {
     if (!data) return;
     setShareCreating(true);
-    const token = localStorage.getItem('token');
     const expiresMap: Record<string, number> = { '1h': 1, '6h': 6, '1d': 24, '7d': 168, '30d': 720 };
     try {
       const urlId = window.location.pathname.split('/').pop();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch('/api/share/create', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           file_id: urlId,
           expires_hours: expiresMap[shareExpires] || 24,
@@ -253,6 +263,7 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
     setTimeout(() => setShareCopied(false), 2000);
   }
 
+  // Keyboard shortcuts for navigation - must be before any early returns
   useEffect(() => {
     function handleKeydown(e: KeyboardEvent) {
       if (renaming || editing) return;
@@ -262,6 +273,31 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
   }, [data, renaming, editing]);
+
+  // Keyboard shortcuts for closing and fullscreen - must be before any early returns
+  useEffect(() => {
+    function handleKeydown(e: KeyboardEvent) {
+      if (renaming || editing) return;
+      // ESC or X to close
+      if (e.key === 'Escape' || e.key === 'x' || e.key === 'X') {
+        window.location.href = `/files${backFolder ? `?folder=${encodeURIComponent(backFolder)}` : ''}`;
+      }
+      // Space for fullscreen (images only)
+      if (e.key === ' ' && data && getFileCategory(data.type) === 'image') {
+        e.preventDefault();
+        const img = document.querySelector('.preview-image');
+        if (img) {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            img.requestFullscreen();
+          }
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [renaming, editing, backFolder, data]);
 
   if (loading) {
     return (
@@ -371,7 +407,7 @@ export default function PreviewPage({ params }: { params: Promise<{ id: string }
             <img
               src={data.preview_url}
               alt={data.filename}
-              className="max-w-full max-h-[80vh] mx-auto rounded-xl shadow-2xl object-contain"
+              className="preview-image max-w-full max-h-[80vh] mx-auto rounded-xl shadow-2xl object-contain"
             />
           </div>
         )}

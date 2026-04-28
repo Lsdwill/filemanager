@@ -49,10 +49,21 @@ export async function generatePreviewUrl(key: string, expires: number = 3600) {
   return url.replace('http://', 'https://');
 }
 
+export async function generateUploadUrl(key: string, contentType?: string, expires: number = 3600) {
+  const url = (client as any).signatureUrl(key, {
+    expires,
+    method: 'PUT',
+    'Content-Type': contentType || 'application/octet-stream',
+  });
+  return url.replace('http://', 'https://');
+}
+
 export function generatePermanentUrl(key: string) {
   const bucket = process.env.OSS_BUCKET_NAME!;
   const region = process.env.OSS_REGION!;
-  return `https://${bucket}.oss-${region}.aliyuncs.com/${key}`;
+  // Remove 'oss-' prefix if already present in region
+  const cleanRegion = region.startsWith('oss-') ? region.slice(4) : region;
+  return `https://${bucket}.oss-${cleanRegion}.aliyuncs.com/${key}`;
 }
 
 export async function generateThumbnailUrl(key: string, width: number = 200, height: number = 200, expires: number = 3600) {

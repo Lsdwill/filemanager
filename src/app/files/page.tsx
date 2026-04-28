@@ -56,6 +56,14 @@ function formatSize(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function formatSpeed(bytesPerSecond: number) {
+  if (bytesPerSecond === 0) return '0 B/s';
+  const k = 1024;
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.floor(Math.log(bytesPerSecond) / Math.log(k));
+  return parseFloat((bytesPerSecond / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleString('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -63,7 +71,255 @@ function formatDate(dateStr: string) {
   });
 }
 
-// Scrolling filename component
+// Lazy loading thumbnail component
+function LazyThumbnail({ file, token, onPreview }: { file: FileInfo; token: string; onPreview: (file: FileInfo) => void }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showHoverPreview, setShowHoverPreview] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !thumbnailUrl && !loading) {
+            setLoading(true);
+            const encodedKey = encodeURIComponent(file.oss_key);
+            fetch(`/api/files/thumbnail/${encodedKey}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) => res.ok && res.json())
+              .then((data) => data?.thumbnail_url && setThumbnailUrl(data.thumbnail_url))
+              .catch(() => {})
+              .finally(() => setLoading(false));
+            observer.unobserve(el);
+          }
+        });
+      },
+      { rootMargin: '100px', threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [file.oss_key, token, thumbnailUrl, loading]);
+
+  const handleMouseEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowHoverPreview(true);
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowHoverPreview(false);
+  };
+
+  return (
+    <>
+      <div ref={ref} className="flex justify-center mb-3 relative">
+        {thumbnailUrl ? (
+          <div
+            className="relative cursor-pointer"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onClick={() => onPreview(file)}
+          >
+            <img src={thumbnailUrl} alt={file.filename} className="w-16 h-16 rounded-lg object-cover transition-transform duration-200 hover:scale-110" />
+            {showHoverPreview && (
+              <div className="absolute top-0 left-0 z-50 transform -translate-y-2 -translate-x-2">
+                <img
+                  src={thumbnailUrl}
+                  alt={file.filename}
+                  className="w-48 h-48 rounded-lg object-contain shadow-2xl border-2 border-white/20 bg-black/50"
+                />
+              </div>
+            )}
+          </div>
+        ) : loading ? (
+          <div className="w-16 h-16 rounded-lg bg-white/10 flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-white/40 animate-spin" />
+          </div>
+        ) : (
+          <Image className="w-8 h-8 text-pink-400" />
+        )}
+      </div>
+    </>
+  );
+}
+
+// Lazy loading thumbnail for list view (smaller size)
+function LazyThumbnailSmall({ file, token, onPreview }: { file: FileInfo; token: string; onPreview: (file: FileInfo) => void }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showHoverPreview, setShowHoverPreview] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !thumbnailUrl && !loading) {
+            setLoading(true);
+            const encodedKey = encodeURIComponent(file.oss_key);
+            fetch(`/api/files/thumbnail/${encodedKey}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) => res.ok && res.json())
+              .then((data) => data?.thumbnail_url && setThumbnailUrl(data.thumbnail_url))
+              .catch(() => {})
+              .finally(() => setLoading(false));
+            observer.unobserve(el);
+          }
+        });
+      },
+      { rootMargin: '100px', threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [file.oss_key, token, thumbnailUrl, loading]);
+
+  const handleMouseEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowHoverPreview(true);
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowHoverPreview(false);
+  };
+
+  return (
+    <>
+      <div ref={ref} className="relative">
+        {thumbnailUrl ? (
+          <div
+            className="relative cursor-pointer"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onClick={() => onPreview(file)}
+          >
+            <img src={thumbnailUrl} alt={file.filename} className="w-10 h-10 rounded-lg object-cover transition-transform duration-200 hover:scale-110" />
+            {showHoverPreview && (
+              <div className="absolute top-0 left-0 z-50 transform -translate-y-2 -translate-x-2">
+                <img
+                  src={thumbnailUrl}
+                  alt={file.filename}
+                  className="w-48 h-48 rounded-lg object-contain shadow-2xl border-2 border-white/20 bg-black/50"
+                />
+              </div>
+            )}
+          </div>
+        ) : loading ? (
+          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+            <RefreshCw className="w-3 h-3 text-white/40 animate-spin" />
+          </div>
+        ) : (
+          <Image className="w-8 h-8 text-pink-400" />
+        )}
+      </div>
+    </>
+  );
+}
+
+// Lazy loading thumbnail for global search results
+function LazyThumbnailSearch({ file, token, onPreview }: { file: FileInfo; token: string; onPreview: (file: FileInfo) => void }) {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [showHoverPreview, setShowHoverPreview] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !thumbnailUrl && !loading) {
+            setLoading(true);
+            const encodedKey = encodeURIComponent(file.oss_key);
+            fetch(`/api/files/thumbnail/${encodedKey}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+              .then((res) => res.ok && res.json())
+              .then((data) => data?.thumbnail_url && setThumbnailUrl(data.thumbnail_url))
+              .catch(() => {})
+              .finally(() => setLoading(false));
+            observer.unobserve(el);
+          }
+        });
+      },
+      { rootMargin: '100px', threshold: 0.1 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [file.oss_key, token, thumbnailUrl, loading]);
+
+  const handleMouseEnter = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowHoverPreview(true);
+    }, 2000);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setShowHoverPreview(false);
+  };
+
+  return (
+    <>
+      <div ref={ref} className="relative">
+        {thumbnailUrl ? (
+          <div
+            className="relative cursor-pointer"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onClick={() => onPreview(file)}
+          >
+            <img src={thumbnailUrl} alt={file.filename} className="w-10 h-10 rounded-lg object-cover transition-transform duration-200 hover:scale-110" />
+            {showHoverPreview && (
+              <div className="absolute top-0 left-0 z-50 transform -translate-y-2 -translate-x-2">
+                <img
+                  src={thumbnailUrl}
+                  alt={file.filename}
+                  className="w-48 h-48 rounded-lg object-contain shadow-2xl border-2 border-white/20 bg-black/50"
+                />
+              </div>
+            )}
+          </div>
+        ) : loading ? (
+          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
+            <RefreshCw className="w-3 h-3 text-white/40 animate-spin" />
+          </div>
+        ) : (
+          getFileIcon(file.type)
+        )}
+      </div>
+    </>
+  );
+}
+
 function ScrollableFilename({ name, className }: { name: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
@@ -281,11 +537,13 @@ export default function FilesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState(0);
+  const [uploadFileName, setUploadFileName] = useState('');
   const [shareFile, setShareFile] = useState<FileInfo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [dragTargetFolder, setDragTargetFolder] = useState<string | null>(null);
-  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const dragCounterRef = useRef(0);
   const [newFolderName, setNewFolderName] = useState('');
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [renamingFile, setRenamingFile] = useState<FileInfo | null>(null);
@@ -320,36 +578,83 @@ export default function FilesPage() {
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-  useEffect(() => {
-    const imageFiles = files.filter(f => isImageType(f.type));
-    if (imageFiles.length === 0) return;
-    const loadThumbnails = async () => {
-      const newThumbnails: Record<string, string> = {};
-      for (const file of imageFiles) {
-        try {
-          const encodedKey = encodeURIComponent(file.oss_key);
-          const res = await fetch(`/api/files/thumbnail/${encodedKey}`, { headers: { Authorization: `Bearer ${token}` } });
-          if (res.ok) { const data = await res.json(); newThumbnails[file.id] = data.thumbnail_url; }
-        } catch {}
-      }
-      setThumbnails(prev => ({ ...prev, ...newThumbnails }));
-    };
-    loadThumbnails();
-  }, [files, token]);
-
   const breadcrumbs = currentFolder
     ? currentFolder.split('/').map((name, i) => ({ name, path: currentFolder.split('/').slice(0, i + 1).join('/') }))
     : [];
 
   async function handleUpload(fileList: FileList | File[]) {
     if (!token) return;
-    setUploading(true); setUploadProgress(0);
-    const total = fileList.length; let completed = 0;
-    for (const file of fileList) {
-      const formData = new FormData(); formData.append('file', file); formData.append('folder', currentFolder);
-      try { await fetch('/api/files/upload', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }); completed++; setUploadProgress(Math.round((completed / total) * 100)); } catch (err) { console.error(err); }
+    setUploading(true); setUploadProgress(0); setUploadSpeed(0);
+
+    const files = Array.from(fileList);
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+    let totalUploaded = 0;
+    const startTime = Date.now();
+
+    for (const file of files) {
+      setUploadFileName(file.name);
+      try {
+        const ossKey = currentFolder ? `${currentFolder}/${file.name}` : file.name;
+
+        // Get signed upload URL
+        const signRes = await fetch('/api/files/upload-sign', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ossKey, contentType: file.type || 'application/octet-stream' }),
+        });
+
+        if (!signRes.ok) {
+          console.error('Failed to get upload URL');
+          continue;
+        }
+
+        const { uploadUrl } = await signRes.json();
+
+        // Upload directly to OSS using XHR for progress tracking
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const fileProgress = e.loaded / e.total;
+              const overallProgress = (totalUploaded + e.loaded) / totalSize;
+              const elapsed = (Date.now() - startTime) / 1000;
+              const speed = elapsed > 0 ? (totalUploaded + e.loaded) / elapsed : 0;
+
+              setUploadProgress(Math.round(overallProgress * 100));
+              setUploadSpeed(speed);
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              totalUploaded += file.size;
+              resolve();
+            } else {
+              reject(new Error('Upload failed'));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Upload failed'));
+
+          xhr.open('PUT', uploadUrl, true);
+          xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+          xhr.send(file);
+        });
+
+        // Register file in database
+        await fetch('/api/files/upload', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ossKey, filename: file.name, size: file.size, folder: currentFolder }),
+        });
+
+      } catch (err) {
+        console.error(err);
+      }
     }
-    setUploading(false); setUploadProgress(0); fetchFiles();
+
+    setUploading(false); setUploadProgress(0); setUploadSpeed(0); setUploadFileName('');
+    fetchFiles();
   }
 
   async function handleDelete(id: string, ossKey: string) {
@@ -415,7 +720,7 @@ export default function FilesPage() {
   }
 
   function handleDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragOver(false);
+    e.preventDefault();
     const fileId = e.dataTransfer.getData('fileId');
     const folderId = e.dataTransfer.getData('folderId');
     const targetFolderPath = e.dataTransfer.getData('targetFolder');
@@ -438,6 +743,12 @@ export default function FilesPage() {
   }
 
   function handleFileClick(e: React.MouseEvent, file: FileInfo) {
+    // Prevent default if clicking on thumbnail (handled by LazyThumbnail component)
+    if ((e.target as HTMLElement).closest('img')) {
+      e.preventDefault();
+      return;
+    }
+
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const newSet = new Set(selectedFiles);
@@ -637,7 +948,31 @@ export default function FilesPage() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-screen" onDragOver={(e) => { e.preventDefault(); if (!e.dataTransfer.types.includes('fileid')) setDragOver(true); }} onDragLeave={() => { setDragOver(false); setDragTargetFolder(null); }} onDrop={handleDrop}>
+      <main className="flex-1 flex flex-col min-h-screen"
+        onDragEnter={(e) => {
+          e.preventDefault();
+          if (!e.dataTransfer.types.includes('fileid')) {
+            dragCounterRef.current++;
+            setDragOver(true);
+          }
+        }}
+        onDragOver={(e) => { e.preventDefault(); }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          dragCounterRef.current--;
+          if (dragCounterRef.current === 0) {
+            setDragOver(false);
+            setDragTargetFolder(null);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          dragCounterRef.current = 0;
+          setDragOver(false);
+          setDragTargetFolder(null);
+          handleDrop(e);
+        }}
+      >
         {/* Top bar */}
         <header className="sticky top-0 z-40 bg-white/5 backdrop-blur-xl border-b border-white/10 px-4 md:px-6 py-4 flex flex-wrap items-center gap-4">
           <button onClick={() => setSidebarOpen(true)} className="md:hidden text-white/60"><Menu className="w-6 h-6" /></button>
@@ -668,9 +1003,7 @@ export default function FilesPage() {
                       onClick={() => { setShowGlobalSearch(false); setGlobalSearch(''); if (isPreviewable(file.type)) openPreview(file); }}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-all text-left"
                     >
-                      {isImageType(file.type) && thumbnails[file.id] ? (
-                        <img src={thumbnails[file.id]} alt={file.filename} className="w-10 h-10 rounded-lg object-cover" />
-                      ) : getFileIcon(file.type)}
+                      {isImageType(file.type) ? (<LazyThumbnailSearch file={file} token={token!} onPreview={openPreview} />) : getFileIcon(file.type)}
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm truncate">{file.filename}</p>
                         <p className="text-white/40 text-xs">{file.folder || '根目录'}</p>
@@ -724,7 +1057,22 @@ export default function FilesPage() {
         )}
 
         {/* Upload progress */}
-        {uploading && (<div className="px-4 md:px-6 py-3 bg-blue-500/10 border-b border-blue-500/20"><div className="flex items-center gap-3"><Upload className="w-5 h-5 text-blue-400 animate-bounce" /><span className="text-blue-400 text-sm">上传中... {uploadProgress}%</span><div className="flex-1 bg-white/10 rounded-full h-2"><div className="bg-blue-500 rounded-full h-2 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div></div>)}
+        {uploading && (
+          <div className="px-4 md:px-6 py-3 bg-blue-500/10 border-b border-blue-500/20">
+            <div className="flex items-center gap-3">
+              <Upload className="w-5 h-5 text-blue-400 animate-bounce" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-blue-400 text-sm truncate max-w-[200px]">{uploadFileName}</span>
+                  <span className="text-blue-400 text-sm">{uploadProgress}% · {formatSpeed(uploadSpeed)}</span>
+                </div>
+                <div className="bg-white/10 rounded-full h-2">
+                  <div className="bg-blue-500 rounded-full h-2 transition-all" style={{ width: `${uploadProgress}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Drag overlay */}
         {dragOver && (<div className="absolute inset-0 z-30 bg-blue-500/20 backdrop-blur-sm flex items-center justify-center"><div className="bg-white/10 rounded-2xl p-8 border border-blue-400/30"><Upload className="w-12 h-12 text-blue-400 mx-auto mb-4" /><p className="text-white text-lg font-medium">拖拽文件到此处上传</p></div></div>)}
@@ -782,7 +1130,7 @@ export default function FilesPage() {
                       <button onClick={() => { setMenuFile(null); handleDelete(file.id, file.oss_key); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-all"><Trash2 className="w-4 h-4" /> 删除</button>
                     </div>)}
                   </div>
-                  <div className="flex justify-center mb-3">{isImageType(file.type) && thumbnails[file.id] ? (<img src={thumbnails[file.id]} alt={file.filename} className="w-16 h-16 rounded-lg object-cover" />) : (getFileIcon(file.type))}</div>
+                  <div className="flex justify-center mb-3">{isImageType(file.type) ? (<LazyThumbnail file={file} token={token!} onPreview={openPreview} />) : (getFileIcon(file.type))}</div>
                   <ScrollableFilename name={file.filename} className="text-white text-sm font-medium mb-1" />
                   <p className="text-white/40 text-xs">{formatSize(file.size)}</p>
                 </div>
@@ -808,7 +1156,7 @@ export default function FilesPage() {
               {filteredFiles.map(file => (
                 <div key={file.id} data-id={file.id} data-type="file" className={`file-item group relative flex items-center gap-4 rounded-xl px-4 py-3 border transition-all cursor-pointer ${selectedFiles.has(file.id) ? 'bg-blue-500/20 border-blue-400 ring-2 ring-blue-400/50' : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-blue-400/30'}`} draggable onDragStart={(e) => { e.dataTransfer.setData('fileId', file.id); e.dataTransfer.effectAllowed = 'move'; }} onClick={(e) => handleFileClick(e, file)}>
                   {selectedFiles.has(file.id) ? <CheckSquare className="w-5 h-5 text-blue-400" /> : <Square className="w-5 h-5 text-white/0 group-hover:text-white/20 transition-all" />}
-                  {isImageType(file.type) && thumbnails[file.id] ? (<img src={thumbnails[file.id]} alt={file.filename} className="w-10 h-10 rounded-lg object-cover" />) : (getFileIcon(file.type))}
+                  {isImageType(file.type) ? (<LazyThumbnailSmall file={file} token={token!} onPreview={openPreview} />) : (getFileIcon(file.type))}
                   <div className="flex-1 min-w-0"><ScrollableFilename name={file.filename} className="text-white text-sm font-medium" /><p className="text-white/40 text-xs">{formatSize(file.size)} · {formatDate(file.created_at)}</p></div>
                   <div className="relative" onMouseLeave={() => setMenuFile(null)}>
                     <button onClick={(e) => { e.stopPropagation(); setMenuFile(file.id); }} className="p-1 rounded-lg text-white/0 group-hover:text-white/40 hover:text-white hover:bg-white/10 transition-all"><MoreVertical className="w-4 h-4" /></button>
