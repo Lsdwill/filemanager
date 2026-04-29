@@ -20,7 +20,7 @@
 - **后端**: Next.js API Routes
 - **存储**: 阿里云OSS
 - **数据库**: JSON 文件存储 (files.json, folders.json, shares.json, batch_shares.json, upload_files.json, upload_shares.json)
-- **进程管理**: PM2
+- **进程管理**: systemd (`filemanager.service`)
 - **Web服务器**: Nginx
 
 ## 项目部署目录
@@ -48,23 +48,25 @@ npm run build
 npm start
 ```
 
-### 使用 PM2 管理
+生产环境实际由 systemd 托管，服务名为 `filemanager.service`。构建完成后必须重启服务，否则 Next.js 进程会继续使用旧构建的静态资源清单，可能导致 `_next/static` 下的 CSS/JS 404。
+
+### 使用 systemd 管理
 
 ```bash
 # 启动服务
-pm2 start npm --name filemanager -- start
+systemctl start filemanager.service
 
 # 重启服务
-pm2 restart filemanager
+systemctl restart filemanager.service
 
 # 停止服务
-pm2 stop filemanager
+systemctl stop filemanager.service
 
 # 查看日志
-pm2 logs filemanager
+journalctl -u filemanager.service -f
 
 # 查看状态
-pm2 status
+systemctl status filemanager.service
 ```
 
 ## 环境变量
@@ -101,7 +103,7 @@ cp -r /data/code/filemanager/data /data/code/filemanager/data.backup.$(date +%Y%
 
 # 恢复数据
 cp -r /data/code/filemanager/data.backup.YYYYMMDD/* /data/code/filemanager/data/
-pm2 restart filemanager
+systemctl restart filemanager.service
 ```
 
 ## Nginx 配置
@@ -137,36 +139,62 @@ server {
 }
 ```
 
-## 数据库初始化
+## 数据初始化
 
-首次运行时，数据库会自动创建。如需重置数据库：
+首次运行时，`data/` 下的 JSON 数据文件会自动创建。如需重置数据，请先备份，再按需清空对应 JSON 文件，最后重启服务：
 
 ```bash
-rm /data/code/filemanager/data/filemanager.db
-pm2 restart filemanager
+cp -r /data/code/filemanager/data /data/code/filemanager/data.backup.$(date +%Y%m%d%H%M%S)
+printf '[]\n' > /data/code/filemanager/data/files.json
+printf '[]\n' > /data/code/filemanager/data/folders.json
+printf '[]\n' > /data/code/filemanager/data/shares.json
+systemctl restart filemanager.service
 ```
 
 ## 构建和部署
 
-```bash
-# 构建项目
-npm run build
+### 在服务器上手动部署
 
-# 重启PM2服务
-pm2 restart filemanager
+```bash
+cd /data/code/filemanager
+npm run build
+systemctl restart filemanager.service
+systemctl status filemanager.service
+```
+
+### 从本地远程部署
+
+本仓库提供了远程部署脚本，会把当前本地代码同步到服务器，再在服务器上执行依赖安装、构建、重启服务和静态资源检查。
+
+```bash
+npm run deploy
+```
+
+脚本默认配置：
+
+- SSH: `root@24.233.2.106 -p 13608`
+- 远程目录: `/data/code/filemanager`
+- systemd 服务: `filemanager.service`
+- 同步阶段不会覆盖远程 `.env`、`data/`、`node_modules/`、`.next/`
+- 默认不会删除远程多余文件；如需清理旧源码文件，可执行 `RSYNC_DELETE=1 npm run deploy`
+
+可通过环境变量覆盖默认值：
+
+```bash
+SSH_HOST=example.com SSH_PORT=22 SSH_USER=root npm run deploy
 ```
 
 ## 监控和日志
 
 ```bash
 # 查看实时日志
-pm2 logs filemanager --lines 100
+journalctl -u filemanager.service -f
 
-# 查看错误日志
-pm2 logs filemanager --err
+# 查看最近100行日志
+journalctl -u filemanager.service -n 100 --no-pager
 
-# 查看资源使用情况
-pm2 monit
+# 查看服务状态
+systemctl status filemanager.service
 ```
 
 ## 故障排查
@@ -181,7 +209,7 @@ lsof -ti:3002
 kill -9 <PID>
 
 # 重启服务
-pm2 restart filemanager
+systemctl restart filemanager.service
 ```
 
 ### 清除缓存
@@ -194,7 +222,13 @@ rm -rf .next/cache
 npm run build
 
 # 重启服务
-pm2 restart filemanager
+systemctl restart filemanager.service
+```
+
+## 部署服务器
+
+```bash
+ssh -p 13608 root@24.233.2.106
 ```
 
 ## 许可证
