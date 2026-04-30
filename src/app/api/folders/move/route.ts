@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '缺少文件夹ID' }, { status: 400 });
     }
 
-    const folder = getFolderById(id);
+    const folder = await getFolderById(id);
     if (!folder) {
       return NextResponse.json({ error: '文件夹不存在' }, { status: 404 });
     }
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     }
 
     // Check for name conflict in target parent
-    const siblings = getSubFolders(targetParent || '');
+    const siblings = await getSubFolders(targetParent || '');
     if (siblings.some((f: any) => f.name === folder.name && f.id !== id)) {
       return NextResponse.json({ error: '目标文件夹中已存在同名文件夹' }, { status: 409 });
     }
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     await copyAndDeletePrefix(oldPath, newPath);
 
     // Update DB
-    const result = moveFolder(id, targetParent || '');
+    const result = await moveFolder(id, targetParent || '');
 
     return NextResponse.json({ success: true, newPath: result?.path });
   } catch (error: any) {

@@ -4,7 +4,7 @@ import { insertUploadShare, getUploadShares } from '@/lib/db';
 
 export async function GET() {
   try {
-    const shares = getUploadShares();
+    const shares = await getUploadShares();
     return NextResponse.json({ shares });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const shareCode = uuidv4().split('-').slice(0, 2).join('');
     const expiresAt = new Date(Date.now() + (expires_hours || 168) * 3600 * 1000).toISOString();
 
-    insertUploadShare({
+    await insertUploadShare({
       id,
       share_code: shareCode,
       name: name || '匿名上传',

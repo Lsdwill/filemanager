@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const { share_code, password, file_id } = await request.json();
 
     // Check if this is a batch share
-    const batchShare = getBatchShareByCode(share_code);
+    const batchShare = await getBatchShareByCode(share_code);
     if (batchShare) {
       // Validate expiration
       const now = new Date();
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: '文件不在分享列表中' }, { status: 403 });
       }
 
-      const file = getFileById(file_id);
+      const file = await getFileById(file_id);
       if (!file) {
         return NextResponse.json({ error: '文件不存在' }, { status: 404 });
       }
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     // Regular share
-    const share = getShareInfo(share_code);
+    const share = await getShareInfo(share_code);
     if (!share) {
       return NextResponse.json({ error: '分享不存在或已过期' }, { status: 404 });
     }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '密码错误' }, { status: 403 });
     }
 
-    const file = getFileById(share.file_id);
+    const file = await getFileById(share.file_id);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }

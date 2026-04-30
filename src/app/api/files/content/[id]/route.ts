@@ -7,7 +7,7 @@ const EDITABLE_TYPES = ['md', 'txt', 'markdown'];
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const file = getFileById(id);
+    const file = await getFileById(id);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }
@@ -32,7 +32,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: '内容必须是字符串' }, { status: 400 });
     }
 
-    const file = getFileById(id);
+    const file = await getFileById(id);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }

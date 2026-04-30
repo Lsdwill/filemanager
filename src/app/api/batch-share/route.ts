@@ -4,7 +4,7 @@ import { insertBatchShare, getBatchShares } from '@/lib/db';
 
 export async function GET() {
   try {
-    const shares = getBatchShares();
+    const shares = await getBatchShares();
     return NextResponse.json({ shares });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     const shareCode = uuidv4().split('-').slice(0, 2).join('');
     const expiresAt = new Date(Date.now() + (expires_hours || 24) * 3600 * 1000).toISOString();
 
-    insertBatchShare({
+    await insertBatchShare({
       id,
       share_code: shareCode,
       file_ids,

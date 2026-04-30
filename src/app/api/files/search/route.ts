@@ -10,7 +10,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ files: [] });
     }
 
-    const allFiles = getFiles();
+    const allFiles = await getFiles();
     const results = allFiles.filter((f: any) =>
       f.filename.toLowerCase().includes(query.toLowerCase())
     );

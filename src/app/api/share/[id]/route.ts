@@ -5,13 +5,13 @@ import { getFileById } from '@/lib/db';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const share = getShareInfo(id);
+    const share = await getShareInfo(id);
 
     if (!share) {
       return NextResponse.json({ error: '分享不存在或已过期' }, { status: 404 });
     }
 
-    const file = getFileById(share.file_id);
+    const file = await getFileById(share.file_id);
 
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });

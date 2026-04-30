@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getBatchShareByCode, getFileById, incrementBatchViewCount } from '@/lib/db';
-import { generatePreviewUrl } from '@/lib/oss';
 
 export async function GET(request: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await params;
-    const share = getBatchShareByCode(code);
+    const share = await getBatchShareByCode(code);
 
     if (!share) {
       return NextResponse.json({ error: '分享不存在' }, { status: 404 });
@@ -18,11 +17,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
     }
 
     // Increment view count
-    incrementBatchViewCount(code);
+    await incrementBatchViewCount(code);
 
     // Get file details
-    const files = share.file_ids.map(fid => {
-      const file = getFileById(fid);
+    const files = (await Promise.all(share.file_ids.map(async (fid) => {
+      const file = await getFileById(fid);
       if (!file) return null;
       return {
         id: file.id,
@@ -31,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
         type: file.type,
         oss_key: file.oss_key,
       };
-    }).filter(Boolean);
+    }))).filter(Boolean);
 
     return NextResponse.json({
       share: {

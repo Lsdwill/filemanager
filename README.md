@@ -19,7 +19,7 @@
 - **前端**: Next.js 16, React, TypeScript, Tailwind CSS
 - **后端**: Next.js API Routes
 - **存储**: 阿里云OSS
-- **数据库**: JSON 文件存储 (files.json, folders.json, shares.json, batch_shares.json, upload_files.json, upload_shares.json)
+- **数据库**: MySQL (`english_learning_pc`)
 - **进程管理**: systemd (`filemanager.service`)
 - **Web服务器**: Nginx
 
@@ -82,28 +82,43 @@ OSS_BUCKET=your-bucket-name
 
 # JWT密钥
 JWT_SECRET=your-jwt-secret
+
+# MySQL数据库
+DATABASE_URL=mysql://rootQCaWQA:mHh7BKvSP58j@223.254.144.155:3306/english_learning_pc
 ```
 
 ## 数据存储
 
-项目使用 JSON 文件存储数据，位于 `/data/code/filemanager/data/` 目录：
+项目使用 MySQL 存储业务数据，数据库名为 `english_learning_pc`。连接串通过 `.env` 中的 `DATABASE_URL` 配置。
 
-- `files.json` - 文件信息
-- `folders.json` - 文件夹信息
-- `shares.json` - 分享链接
-- `batch_shares.json` - 批量分享链接
-- `upload_files.json` - 上传分享文件
-- `upload_shares.json` - 上传分享链接
+主要表：
+
+- `files` - 文件信息
+- `folders` - 文件夹信息
+- `shares` - 单文件分享链接
+- `batch_shares` - 批量分享链接
+- `upload_shares` - 匿名上传分享链接
+- `upload_files` - 匿名上传文件
+
+### 从 JSON 迁移到 MySQL
+
+历史 JSON 数据仍保留在 `/data/code/filemanager/data/`，可作为迁移核对和回滚备份。首次切换 MySQL 时，在服务器 `.env` 配好 `DATABASE_URL` 后执行一次：
+
+```bash
+cd /data/code/filemanager
+npm run db:migrate
+```
+
+迁移脚本会自动创建表，并按主键/唯一键跳过重复记录，可重复执行，不会删除 JSON 文件。
 
 ### 数据备份
 
 ```bash
-# 备份数据
-cp -r /data/code/filemanager/data /data/code/filemanager/data.backup.$(date +%Y%m%d)
+# 备份MySQL数据
+mysqldump -h 223.254.144.155 -P 3306 -u rootQCaWQA -p english_learning_pc > filemanager.$(date +%Y%m%d).sql
 
-# 恢复数据
-cp -r /data/code/filemanager/data.backup.YYYYMMDD/* /data/code/filemanager/data/
-systemctl restart filemanager.service
+# 恢复MySQL数据
+mysql -h 223.254.144.155 -P 3306 -u rootQCaWQA -p english_learning_pc < filemanager.YYYYMMDD.sql
 ```
 
 ## Nginx 配置
@@ -139,21 +154,18 @@ server {
 }
 ```
 
-## 数据初始化
-
-首次运行时，`data/` 下的 JSON 数据文件会自动创建。如需重置数据，请先备份，再按需清空对应 JSON 文件，最后重启服务：
-
-```bash
-cp -r /data/code/filemanager/data /data/code/filemanager/data.backup.$(date +%Y%m%d%H%M%S)
-printf '[]\n' > /data/code/filemanager/data/files.json
-printf '[]\n' > /data/code/filemanager/data/folders.json
-printf '[]\n' > /data/code/filemanager/data/shares.json
-systemctl restart filemanager.service
-```
-
 ## 构建和部署
 
 ### 在服务器上手动部署
+
+首次从 JSON 切换到 MySQL 时，先执行一次迁移：
+
+```bash
+cd /data/code/filemanager
+npm run db:migrate
+```
+
+之后常规部署：
 
 ```bash
 cd /data/code/filemanager

@@ -6,7 +6,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
 
-    const file = getFileById(id);
+    const file = await getFileById(id);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }
@@ -14,7 +14,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const previewUrl = await generatePreviewUrl(file.oss_key, 3600);
 
     // Get sibling files in the same folder for prev/next navigation and dock bar
-    const siblings = getFiles(file.folder);
+    const siblings = await getFiles(file.folder);
     const currentIndex = siblings.findIndex((f: any) => f.id === id);
     const prevId = currentIndex > 0 ? siblings[currentIndex - 1].id : null;
     const nextId = currentIndex < siblings.length - 1 ? siblings[currentIndex + 1].id : null;

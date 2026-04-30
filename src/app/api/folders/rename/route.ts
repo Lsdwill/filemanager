@@ -9,18 +9,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400 });
     }
 
-    const folder = getFolderById(id);
+    const folder = await getFolderById(id);
     if (!folder) {
       return NextResponse.json({ error: '文件夹不存在' }, { status: 404 });
     }
 
     // Check for name conflict in same parent
-    const siblings = getSubFolders(folder.parent);
+    const siblings = await getSubFolders(folder.parent);
     if (siblings.some((f: any) => f.name === newName && f.id !== id)) {
       return NextResponse.json({ error: '已存在同名文件夹' }, { status: 409 });
     }
 
-    const result = renameFolder(id, newName);
+    const result = await renameFolder(id, newName);
 
     return NextResponse.json({ success: true, newName, newPath: result?.path });
   } catch (error: any) {

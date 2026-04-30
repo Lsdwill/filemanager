@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ key:
     const { key } = await params;
     const ossKey = key;
 
-    const file = getFileByOssKey(ossKey);
+    const file = await getFileByOssKey(ossKey);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }

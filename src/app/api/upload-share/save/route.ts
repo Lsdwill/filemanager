@@ -6,7 +6,7 @@ export async function POST(request: Request) {
   try {
     const { file_id } = await request.json();
 
-    const uploadFiles = getUploadFiles();
+    const uploadFiles = await getUploadFiles();
     const file = uploadFiles.find((f: any) => f.id === file_id);
 
     if (!file) {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
     // Create a new file record in the main files DB
     const newFileId = uuidv4();
-    insertFile({
+    await insertFile({
       id: newFileId,
       oss_key: file.oss_key,
       filename: file.filename,
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     });
 
     // Mark the upload file as saved
-    markUploadFileSaved(file_id);
+    await markUploadFileSaved(file_id);
 
     return NextResponse.json({ success: true, new_file_id: newFileId });
   } catch (error: any) {

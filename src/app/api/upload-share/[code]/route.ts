@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getUploadShareByCode, getUploadFilesByShare, deleteUploadShare } from '@/lib/db';
-import { deleteObject, listObjectsByPrefix } from '@/lib/oss';
+import { deleteObject } from '@/lib/oss';
 
 export async function GET(request: Request, { params }: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await params;
-    const share = getUploadShareByCode(code);
+    const share = await getUploadShareByCode(code);
 
     if (!share) {
       return NextResponse.json({ error: '分享不存在' }, { status: 404 });
@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
     const expiresAt = new Date(share.expires_at);
     if (now > expiresAt) {
       // Clean up expired share
-      const filesToDelete = deleteUploadShare(share.id);
+      const filesToDelete = await deleteUploadShare(share.id);
       for (const file of filesToDelete) {
         try {
           await deleteObject(file.oss_key);
@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
       return NextResponse.json({ error: '分享已过期' }, { status: 404 });
     }
 
-    const files = getUploadFilesByShare(share.id);
+    const files = await getUploadFilesByShare(share.id);
 
     return NextResponse.json({
       share: {

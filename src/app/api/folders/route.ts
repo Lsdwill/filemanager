@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { uploadFile, deleteObject, listObjects } from '@/lib/oss';
-import { insertFolder, getFolderByPath, getFolderById, deleteFolder, deleteFileByOssKey, getFolders, getFiles } from '@/lib/db';
+import { uploadFile, deleteObject } from '@/lib/oss';
+import { insertFolder, getFolderByPath, getFolderById, deleteFolder, getFolders, getFiles } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function GET() {
-  return NextResponse.json({ folders: getFolders() });
+  return NextResponse.json({ folders: await getFolders() });
 }
 
 export async function POST(request: Request) {
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const folderPath = parent ? `${parent}/${name}` : name;
 
     // Check if folder already exists
-    const existing = getFolderByPath(folderPath);
+    const existing = await getFolderByPath(folderPath);
     if (existing) {
       return NextResponse.json({ error: '文件夹已存在' }, { status: 400 });
     }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     await uploadFile(`${folderPath}/.keep`, Buffer.from(''));
 
     const id = uuidv4();
-    insertFolder({
+    await insertFolder({
       id,
       name,
       path: folderPath,
@@ -45,13 +45,13 @@ export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
 
-    const folder = getFolderById(id);
+    const folder = await getFolderById(id);
     if (!folder) {
       return NextResponse.json({ error: '文件夹不存在' }, { status: 404 });
     }
 
     // Check if folder contains any files (including sub-folders)
-    const allFiles = getFiles();
+    const allFiles = await getFiles();
     const filesInFolder = allFiles.filter((f: any) => f.folder === folder.path || f.folder.startsWith(folder.path + '/'));
     if (filesInFolder.length > 0) {
       return NextResponse.json({ error: `文件夹内有 ${filesInFolder.length} 个文件，请先清空文件再删除` }, { status: 400 });
@@ -60,7 +60,7 @@ export async function DELETE(request: Request) {
     // Delete the .keep placeholder from OSS
     await deleteObject(`${folder.path}/.keep`);
 
-    deleteFolder(id);
+    await deleteFolder(id);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

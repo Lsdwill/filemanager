@@ -6,7 +6,7 @@ export function createShareCode(): string {
   return uuidv4().split('-').slice(0, 2).join('');
 }
 
-export function createShare(options: {
+export async function createShare(options: {
   file_id: string;
   is_password_protected: boolean;
   password: string | null;
@@ -16,7 +16,7 @@ export function createShare(options: {
   const shareCode = createShareCode();
   const expiresAt = new Date(Date.now() + options.expires_hours * 3600 * 1000).toISOString();
 
-  insertShare({
+  await insertShare({
     id,
     file_id: options.file_id,
     share_code: shareCode,
@@ -28,18 +28,18 @@ export function createShare(options: {
   return { id, shareCode, expiresAt };
 }
 
-export function getShareInfo(code: string) {
-  const share = getShareByCode(code);
+export async function getShareInfo(code: string) {
+  const share = await getShareByCode(code);
   if (!share) return null;
 
   const now = new Date();
   const expiresAt = new Date(share.expires_at);
   if (now > expiresAt) {
-    deleteShare(share.id);
+    await deleteShare(share.id);
     return null;
   }
 
-  incrementViewCount(code);
+  await incrementViewCount(code);
   return share;
 }
 

@@ -5,7 +5,7 @@ import { deleteObject } from '@/lib/oss';
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const filesToDelete = deleteUploadShare(id);
+    const filesToDelete = await deleteUploadShare(id);
 
     // Delete all files from OSS
     for (const file of filesToDelete) {

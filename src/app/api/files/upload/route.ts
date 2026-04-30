@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const id = uuidv4();
     const type = filename.split('.').pop() || '';
 
-    insertFile({ id, oss_key: ossKey, filename, size, type, folder });
+    await insertFile({ id, oss_key: ossKey, filename, size, type, folder });
 
     return NextResponse.json({ id, oss_key: ossKey, filename, size, type, folder });
   } catch (error: any) {

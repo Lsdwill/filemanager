@@ -8,7 +8,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ k
     const ossKey = key;
 
     await deleteObject(ossKey);
-    deleteFileByOssKey(ossKey);
+    await deleteFileByOssKey(ossKey);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

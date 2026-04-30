@@ -13,14 +13,14 @@ export async function GET(request: Request) {
     for (const obj of objects) {
       // Skip .keep placeholder files used for folder representation
       if (obj.name.endsWith('/.keep')) continue;
-      const existing = getFileByOssKey(obj.name);
+      const existing = await getFileByOssKey(obj.name);
       if (!existing) {
         const filename = obj.name.split('/').pop() || obj.name;
         const type = filename.split('.').pop() || '';
         // Determine folder from oss_key path
         const parts = obj.name.split('/');
         const fileFolder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-        insertFile({
+        await insertFile({
           id: uuidv4(),
           oss_key: obj.name,
           filename,
@@ -32,15 +32,15 @@ export async function GET(request: Request) {
     }
 
     // Clean up any .keep files that were previously synced into the DB
-    const allFiles = getFiles();
+    const allFiles = await getFiles();
     for (const file of allFiles) {
       if (file.oss_key.endsWith('/.keep') || file.filename === '.keep') {
-        deleteFileByOssKey(file.oss_key);
+        await deleteFileByOssKey(file.oss_key);
       }
     }
 
-    const files = getFiles(folder);
-    const subFolders = getSubFolders(folder);
+    const files = await getFiles(folder);
+    const subFolders = await getSubFolders(folder);
 
     return NextResponse.json({ files, folders: subFolders, currentFolder: folder });
   } catch (error: any) {

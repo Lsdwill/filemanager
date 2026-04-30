@@ -5,7 +5,7 @@ export async function POST(request: Request) {
   try {
     const { file_id, expires_hours, is_password_protected, password } = await request.json();
 
-    const result = createShare({
+    const result = await createShare({
       file_id,
       is_password_protected,
       password,

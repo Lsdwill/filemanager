@@ -5,7 +5,7 @@ import { getFileById } from '@/lib/db';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const file = getFileById(id);
+    const file = await getFileById(id);
     if (!file) {
       return NextResponse.json({ error: '文件不存在' }, { status: 404 });
     }

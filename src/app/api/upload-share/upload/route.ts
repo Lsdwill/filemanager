@@ -13,11 +13,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '缺少文件或分享ID' }, { status: 400 });
     }
 
-    const share = getUploadShareByCode(uploadShareId) ||
-      (await (async () => {
-        const shares = await import('@/lib/db').then(m => m.getUploadShares());
-        return shares.find(s => s.id === uploadShareId);
-      })());
+    const share = await getUploadShareByCode(uploadShareId);
 
     if (!share) {
       return NextResponse.json({ error: '分享不存在' }, { status: 404 });
@@ -37,7 +33,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await uploadFile(ossKey, buffer);
 
-    insertUploadFile({
+    await insertUploadFile({
       id,
       upload_share_id: share.id,
       oss_key: ossKey,
